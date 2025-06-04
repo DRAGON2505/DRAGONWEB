@@ -7,7 +7,9 @@
     body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      background: #0b0f3b; /* deep dark navy blue */
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
       overflow: hidden;
       color: white;
       height: 100vh;
@@ -17,14 +19,12 @@
       position: relative;
     }
 
-    canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 0;
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
 
-    /* DRAGON MODS name fixed top center */
     .dragon-title {
       position: fixed;
       top: 20px;
@@ -36,6 +36,12 @@
       text-shadow: 0 0 15px cyan;
       user-select: none;
       z-index: 20;
+      animation: blink 5s infinite;
+    }
+
+    @keyframes blink {
+      0%, 90%, 100% { opacity: 1; }
+      95% { opacity: 0; }
     }
 
     .box {
@@ -61,7 +67,7 @@
       font-size: 24px;
       font-weight: bold;
       color: #ccc;
-      margin: 20px 0;
+      margin: 12px 0;
     }
 
     button {
@@ -131,9 +137,7 @@
   </style>
 </head>
 <body>
-  <canvas id="bg"></canvas>
-
-  <div class="dragon-title">DRAGON MODS</div>
+  <div class="dragon-title">DRAGON PREDICTOR</div>
 
   <!-- LOGIN -->
   <div class="login-box" id="login">
@@ -146,6 +150,7 @@
   <!-- PREDICTOR -->
   <div id="predictor" class="container">
     <div class="box">
+      <div class="textview" id="textview1">Period: -</div>
       <div class="textview" id="textview2">00:00</div>
       <div id="result">-</div>
       <button id="predictBtn">Predict</button>
@@ -153,94 +158,39 @@
   </div>
 
   <script>
-    const canvas = document.getElementById("bg");
-    const ctx = canvas.getContext("2d");
-    let particles = [];
-
-    function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-
-    window.onresize = resize;
-    resize();
-
-    function createParticles() {
-      particles = [];
-      for (let i = 0; i < 100; i++) {
-        particles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          vx: Math.random() * 1 - 0.5,
-          vy: Math.random() * 1 - 0.5
-        });
-      }
-    }
-
-    function drawParticles() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (let p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-        ctx.fillStyle = "black"; // black dots
-        ctx.fill();
-      }
-
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 100) {
-            ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = "rgba(0,0,0,0.2)";
-            ctx.stroke();
-          }
-        }
-      }
-    }
-
-    createParticles();
-    setInterval(drawParticles, 30);
-
     let lastPeriod = "";
     const predictBtn = document.getElementById("predictBtn");
 
     function getCurrentPeriod() {
       const now = new Date();
       const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const istOffset = 5.5 * 60 * 60000;
-      const istTime = new Date(utc + istOffset);
+      const ist = new Date(utc + 5.5 * 60 * 60000);
 
-      const start = new Date(istTime.getFullYear(), istTime.getMonth(), istTime.getDate(), 5, 29, 0, 0);
-      const elapsedMinutes = Math.floor((istTime - start) / 60000);
-      const periodCount = 589 + Math.max(0, elapsedMinutes);
+      const base = new Date(ist.getFullYear(), ist.getMonth(), ist.getDate(), 5, 29, 0, 0);
+      const diffMins = Math.floor((ist - base) / 60000);
+      const periodNum = diffMins >= 0 ? diffMins : 0;
 
-      const dateStr = istTime.toISOString().slice(0, 10).replace(/-/g, '');
-      return dateStr + '100001' + String(periodCount).padStart(4, '0');
+      const dateStr = ist.toISOString().split("T")[0].replace(/-/g, "");
+      const periodStr = String(periodNum).padStart(4, '0');
+      return {
+        code: `${dateStr}100001${periodStr}`,
+        display: periodNum
+      };
     }
 
     function updateTimeViews() {
       const now = new Date();
       const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const istOffset = 5.5 * 60 * 60000;
-      const istTime = new Date(utc + istOffset);
-
-      const seconds = istTime.getSeconds();
+      const ist = new Date(utc + 5.5 * 60 * 60000);
+      const seconds = ist.getSeconds();
       const remaining = 60 - seconds;
 
       document.getElementById("textview2").textContent = `00:${String(remaining).padStart(2, '0')}`;
 
-      const fullPeriod = getCurrentPeriod();
-      if (fullPeriod !== lastPeriod) {
+      const period = getCurrentPeriod();
+      document.getElementById("textview1").textContent = `Period: ${period.code}`;
+
+      if (period.code !== lastPeriod) {
         predictBtn.disabled = false;
         document.getElementById("result").textContent = "-";
       }
@@ -276,17 +226,18 @@
     }
 
     function predict() {
-      const currentPeriod = getCurrentPeriod();
-      if (currentPeriod === lastPeriod) {
+      const current = getCurrentPeriod();
+      if (current.code === lastPeriod) {
         showToast("Wait for next period ⏳");
         predictBtn.disabled = true;
         return;
       }
+
       const rand = Math.floor(Math.random() * 10);
       const predicted = rand <= 4 ? "𝚂𝙼𝙰𝙻𝙻" : "𝙱𝙸𝙶";
       const reversed = predicted === "𝚂𝙼𝙰𝙻𝙻" ? "𝙱𝙸𝙶" : "𝚂𝙼𝙰𝙻𝙻";
       document.getElementById("result").textContent = reversed;
-      lastPeriod = currentPeriod;
+      lastPeriod = current.code;
       predictBtn.disabled = true;
     }
 
